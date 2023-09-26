@@ -1,0 +1,10 @@
+psycopg2==2.9.7
+python-decouple==3.8
+pandas==2.0.3
+pyarrow==13.0.0
+fsspec==2023.6.0
+gcsfs==2023.6.0
+tqdm==4.66.1
+pytest==7.4.0
+loguru==0.6.0
+google-cloud-storage

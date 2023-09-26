@@ -1,0 +1,10 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-t', 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_TAG}', '.' ]
+
+substitutions:
+    _PROJECT_ID: test-app-309909 # default value
+    _IMAGE_NAME: cloud-run-batch-job  # default value
+    _TAG: v1.0
+images:
+- 'gcr.io/${_PROJECT_ID}/${_IMAGE_NAME}:${_TAG}'

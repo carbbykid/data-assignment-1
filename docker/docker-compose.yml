@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  functional_pipeline_test_postgresdb:
+    container_name: "onprem_postgresdb"
+    build: "./postgres_local/."
+    environment: 
+      - POSTGRES_PASSWORD=123
+    ports:
+      - "5432:5432"
