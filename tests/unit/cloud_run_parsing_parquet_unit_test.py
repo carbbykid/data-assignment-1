@@ -76,6 +76,7 @@ test_data = [
     ids=[test[0] for test in test_data]
 )
 def test_transform_event_attribute(test_name, event_attribute, expected):
+    print(f"==>> event_attribute: {event_attribute}")
     result = _transform_event_attribute(event_attribute)
     len(result) == len(expected)
     for item in expected:

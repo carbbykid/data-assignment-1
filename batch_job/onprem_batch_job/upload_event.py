@@ -28,6 +28,13 @@ def encode_destination_path(local_file_path:str,
     """
     destination = ""
     #TODO: Begin
+    arr_path = local_file_path.split("/")
+
+    (dir_index,dir_name) = next((index-1,arr_path[index-1])  for index, value in enumerate(arr_path) if ".json" in value)
+
+    path = dir_name.replace("-", "/")
+    destination = os.path.join(destination_prefix, path,arr_path[dir_index+1])
+
     #TODO: End
     return destination 
 
@@ -77,6 +84,31 @@ def upload_file_to_storage(input_path:str,bucket_name:str,destination_prefix:str
     """
     client = storage.Client()
     #TODO: Begin
+    bucket = client.get_bucket(bucket_name)
+
+    ### get list dir just 1 level
+
+    ## SOLUTION 1:
+    # files = os.listdir(input_path)
+
+    # for file in files:
+    #     path = file.replace("-", "/")
+    #     prefix = os.path.join(destination_prefix, path)
+
+    #     for dirpath, dirnames, filenames in os.walk(os.path.join(input_path,file)):
+    #         for filename in filenames:
+    #             blob = bucket.blob(os.path.join(prefix,filename))
+    #             blob.upload_from_filename(os.path.join(dirpath, filename))
+
+    ## SOLUTION 2:
+    for root, dirs, files in os.walk(input_path):
+        for filename in files:
+            file_path = os.path.join(root,filename)
+            blob = bucket.blob(encode_destination_path(file_path,destination_prefix))
+            print(f"==>> blob: {blob}")
+            blob.upload_from_filename(file_path)
+            print(f"==>> file_path: {file_path}")
+
     #TODO: End
 
 

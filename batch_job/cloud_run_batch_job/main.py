@@ -1,10 +1,13 @@
 from typing import List
 import pandas as pd
 import pyarrow as pa
+from pyarrow import json as pj
+from pyarrow import parquet as pq
 
 from decouple import Config, RepositoryEnv
 from google.cloud import storage
 from loguru import logger
+import json
 
 
 def list_file_in_bucket(bucket_name: str, prefix: str) -> List[storage.Blob]:
@@ -41,11 +44,14 @@ def list_file_in_bucket(bucket_name: str, prefix: str) -> List[storage.Blob]:
     storage_client = storage.Client()
     list_file = []
     # TODO BEGIN CODE
+    for blob in storage_client.list_blobs(bucket_name,prefix=prefix):
+        list_file.append(blob)
     # TODO END
     return list_file
 
 
 def _transform_event_attribute(event: dict) -> list:
+    print(f"==>> event: {event}")
     """
         Hàm này nhận một dictionary event_attribute 
         và trả về một list các dictionary theo tiêu chí sau:
@@ -140,7 +146,12 @@ def _transform_event_attribute(event: dict) -> list:
     """
     transformed_data = []
     # TODO: Begin
-    
+    # isBool = (isinstance(False,int) and type(False) != bool)s
+    if event:
+        transformed_data = [
+            { "key":key ,"int_value": (isinstance(value,int) and type(value) != bool) and value or None, "float_value": isinstance(value,float) and value or None,"string_value": isinstance(value,str) and value or None, "bool_value": value if isinstance(value, bool) else None} if key is not None else [] for key, value in event.items()]
+    else:
+        transformed_data = event
     # TODO: End
     return transformed_data
 
@@ -182,6 +193,50 @@ def extract_transform_load_event_to_parquet(
                 - gs://mmo_adventure/gold-zone/event_info/year=2023/month=8/day=9/something_also_have_timestamp_2023_08_09_12_00_00.parquet
     """
     # TODO: Begin
+    data = blob.download_as_bytes()
+    parsed_data = []
+    for line in data.decode('utf-8').split("\n"):
+        if line:
+            # convert string json to dict
+            event=json.loads(line)
+            parsed_data.append({**event,**{"event_attribute":_transform_event_attribute(event["event_attribute"])}})
+            # attribute_of_line = pd.read_json(line, lines=True).to_dict()["event_attribute"]
+        else: 
+            continue
+
+    ### CONVERT JSON TO DATAFRAME: tao file json -> create schema -> dung pyarrow.json.read_json(jsonfile, schema) -> table -> table.to_pandas -> dataframe
+    ### CONVERT DATAFRAME to TABLE: pa.Table.from_pandas(df) -> dataframe
+    # Convert list dict to list json  and write file
+    with open("dict_to_json.json", "w",encoding="utf-8") as outfile: 
+        for item in parsed_data:
+            outfile.write(json.dumps(item) + "\n")
+
+    parse_opt = pj.ParseOptions(
+        explicit_schema = schema
+    )
+    # How to read json with pyarrow from json string, don't need write file
+    table = pj.read_json("./dict_to_json.json",parse_options=parse_opt)
+
+    # pq.write_table(table,"table.parquet", compression="snappy")
+
+    # How to read parquet from table, don't need write file
+    # pd.read_parquet("./table.parquet",engine = "pyarrow")
+
+    # Convert Pyarrow sang pandas
+    df = table.to_pandas(types_mapper = pd.ArrowDtype)
+    
+    df['datetime'] = df['timestamp'].str.split(" ").map(lambda x: x[0])
+    df['year'] = df['datetime'].str.split("-").map(lambda x: x[0])
+    df['month'] = df['datetime'].str.split("-").map(lambda x: x[1])
+    df['day'] = df['datetime'].str.split("-").map(lambda x: x[2])
+
+    new_table = pa.Table.from_pandas(df)
+
+    gcs = pa.fs.GcsFileSystem(anonymous=False)
+    pq.write_to_dataset(new_table,
+                                root_path=f'{bucket_name}/{destination_prefix}',
+                                partition_cols=['year','month','day'],
+                                filesystem=gcs)
     # TODO: End
 
 
@@ -196,9 +251,24 @@ if __name__ == "__main__":
         Tạo schema
     """
     schema = pa.schema([
-        #TODO: Begin 
-        #TODO: End 
+    #TODO: Begin 
+        ('event_id', pa.string()),
+        ('event_type', pa.string()),
+        ('timestamp', pa.string()),
+        ('user_id', pa.int64()),
+        ('location', pa.string()),
+        ('device', pa.string()),
+        ('ip_address', pa.string()),
+        ('event_attribute', pa.list_(pa.struct([
+            ('key', pa.string()),
+            ('int_value', pa.int64()),
+            ('float_value', pa.float64()),
+            ('string_value', pa.string()),
+            ('bool_value', pa.bool_())
+    ])))
+    #TODO: End 
     ])
+
     for blob in list_file_in_bucket(bucket_name=BUCKET_NAME, prefix=SOURCE_PREFIX):
         logger.info(f"Process file {blob.name}")
         extract_transform_load_event_to_parquet(
@@ -206,4 +276,4 @@ if __name__ == "__main__":
             bucket_name=BUCKET_NAME,
             destination_prefix=DESTINATION_PREFIX,
             schema=schema
-        )   
+        )

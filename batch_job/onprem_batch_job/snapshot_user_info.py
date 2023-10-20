@@ -41,8 +41,17 @@ def get_user_info(dbconfig: dict) -> List[dict]:
     connection = psycopg2.connect(**dbconfig)
     result = None
     try:
+        # Get connection PostgreSQL
         cursor = connection.cursor(cursor_factory=DictCursor)
         #TODO: Begin
+        # Query sql
+        cursor.execute("SELECT * FROM user_info")
+        users_data = []
+        # Convert data to list[Dict]
+        for row in cursor:
+            user={"user_id":row[0], "birthday":row[1].strftime("%Y-%m-%d"), "sign_in_date": row[2].strftime("%Y-%m-%d"), "sex": row[3], "country": row[4]}
+            users_data.append(user)
+        result = users_data
         #TODO: End 
     except Exception as e:
         print(e)
@@ -82,10 +91,20 @@ def upload_from_string(data: str, bucket_name: str, destination_path: str) -> No
         {"user_id" : 1,"birthday": "1990-01-01","sign_in_date": "2023-01-01","sex": "Male","country": "Vietnam"} \n
         {"user_id" : 2,"birthday": "1990-01-01","sign_in_date": "2023-01-02","sex": "Male","country": "Lao"} \n
     """
+    # Get client cloud
     client = storage.Client()
     #TODO: Begin
+    # Get bucket or create bucket
+    bucket = client.bucket(bucket_name)
+    if not bucket.exists():
+        bucket = client.create_bucket(bucket_name)
+    # Create blob
+    blob = bucket.blob(destination_path)
+    is_existed = blob.exists()
+    if not is_existed:
+        # Upload string json to blob and replace into file json    
+        blob.upload_from_string(data,content_type='application/json')
     #TODO: End
-
 
 if __name__ == "__main__":
     """
@@ -105,7 +124,7 @@ if __name__ == "__main__":
         "database": env_config.get("DB"),
     }
     user_info = get_user_info(dbconfig)
-
+    #dumps key object to string, and handle data is't object to iso time, prehension, join array to string
     data = "\n".join([json.dumps(u, default=datetime_serializer) for u in user_info])
 
     upload_from_string(data=data, bucket_name=BUCKET_NAME, destination_path=USER_DESTINATION_PATH)

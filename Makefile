@@ -6,7 +6,7 @@ VENV_BIN = $(VENV)/bin
 PYTHON_VENV= $(VENV_BIN)/python3
 
 DOCKER_COMPOSE = ./docker/docker-compose.yml
-DATA_INPUT_PATH=../../data-resample
+DATA_INPUT_PATH=../../data
 TESTS_FOLDER = ./tests
 
 REGION=asia-east1
@@ -49,6 +49,11 @@ teardown: terraform_down
 snapshot_user_info: 
 	@echo "Snapshoting user_info db onprem"
 	@cd ./batch_job/onprem_batch_job; ../../$(PYTHON_VENV) ./snapshot_user_info.py
+	@echo "Snapshoting Done"
+
+cloud_run_batch_job: 
+	@echo "Snapshoting cloud_run_batch_job db onprem"
+	@cd ./batch_job/cloud_run_batch_job; ../../$(PYTHON_VENV) ./main.py
 	@echo "Snapshoting Done"
 
 upload_event:	
