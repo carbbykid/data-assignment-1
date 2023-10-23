@@ -105,9 +105,7 @@ def upload_file_to_storage(input_path:str,bucket_name:str,destination_prefix:str
         for filename in files:
             file_path = os.path.join(root,filename)
             blob = bucket.blob(encode_destination_path(file_path,destination_prefix))
-            print(f"==>> blob: {blob}")
             blob.upload_from_filename(file_path)
-            print(f"==>> file_path: {file_path}")
 
     #TODO: End
 

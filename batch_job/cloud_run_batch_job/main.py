@@ -51,7 +51,6 @@ def list_file_in_bucket(bucket_name: str, prefix: str) -> List[storage.Blob]:
 
 
 def _transform_event_attribute(event: dict) -> list:
-    print(f"==>> event: {event}")
     """
         Hàm này nhận một dictionary event_attribute 
         và trả về một list các dictionary theo tiêu chí sau:
@@ -203,7 +202,7 @@ def extract_transform_load_event_to_parquet(
             # attribute_of_line = pd.read_json(line, lines=True).to_dict()["event_attribute"]
         else: 
             continue
-
+        
     ### CONVERT JSON TO DATAFRAME: tao file json -> create schema -> dung pyarrow.json.read_json(jsonfile, schema) -> table -> table.to_pandas -> dataframe
     ### CONVERT DATAFRAME to TABLE: pa.Table.from_pandas(df) -> dataframe
     # Convert list dict to list json  and write file
@@ -226,11 +225,33 @@ def extract_transform_load_event_to_parquet(
     df = table.to_pandas(types_mapper = pd.ArrowDtype)
     
     df['datetime'] = df['timestamp'].str.split(" ").map(lambda x: x[0])
-    df['year'] = df['datetime'].str.split("-").map(lambda x: x[0])
-    df['month'] = df['datetime'].str.split("-").map(lambda x: x[1])
-    df['day'] = df['datetime'].str.split("-").map(lambda x: x[2])
+    df['year'] = df['datetime'].str.split("-").map(lambda x: x[0]).map(int)
+    df['month'] = df['datetime'].str.split("-").map(lambda x: x[1]).map(int)
+    df['day'] = df['datetime'].str.split("-").map(lambda x: x[2]).map(int)
 
-    new_table = pa.Table.from_pandas(df)
+    new_schema = pa.schema([
+        ("event_id", pa.string()),
+        ("event_type", pa.string()),
+        ("timestamp", pa.timestamp("ms")),
+        ("user_id", pa.int32()),
+        ("year", pa.int32()),
+        ("month", pa.int32()),
+        ("day", pa.int32()),
+        ("location", pa.string()),
+        ("device", pa.string()),
+        ("ip_address", pa.string()),
+        ("event_attribute", pa.list_(
+            pa.struct([
+                ("key", pa.string()),
+                ("int_value", pa.int32()),
+                ("float_value", pa.float32()),
+                ("string_value", pa.string()),
+                ("bool_value", pa.bool_())
+            ])
+        )),
+    ])
+    
+    new_table = pa.Table.from_pandas(df, schema=new_schema)
 
     gcs = pa.fs.GcsFileSystem(anonymous=False)
     pq.write_to_dataset(new_table,
@@ -254,15 +275,15 @@ if __name__ == "__main__":
     #TODO: Begin 
         ('event_id', pa.string()),
         ('event_type', pa.string()),
-        ('timestamp', pa.string()),
-        ('user_id', pa.int64()),
+        ('timestamp',  pa.string()),
+        ('user_id', pa.int32()),
         ('location', pa.string()),
         ('device', pa.string()),
         ('ip_address', pa.string()),
         ('event_attribute', pa.list_(pa.struct([
             ('key', pa.string()),
-            ('int_value', pa.int64()),
-            ('float_value', pa.float64()),
+            ('int_value', pa.int32()),
+            ('float_value', pa.float32()),
             ('string_value', pa.string()),
             ('bool_value', pa.bool_())
     ])))
